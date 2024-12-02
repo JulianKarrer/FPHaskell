@@ -2,6 +2,8 @@
 {-# OPTIONS_GHC -Wno-noncanonical-monad-instances #-}
 module Main where
 import Data.Maybe (isNothing, fromMaybe)
+import Data.Char (isAlpha)
+import WhileInterp
 
 main :: IO ()
 main = putStrLn "Hello, Haskell!"
@@ -100,7 +102,7 @@ instance Applicative Partial where
     pure = undefined
     (<*>) :: Partial (a -> b) -> Partial a -> Partial b
     (<*>) = undefined
-instance Monad Partial where 
+instance Monad Partial where
     (>>=) :: Partial a -> (a -> Partial b) -> Partial b
     (Partial mayb) >>= f = case mayb of
         Just val -> f val
@@ -111,8 +113,8 @@ failure :: Partial a
 failure = Partial Nothing
 
 (!?) :: [a] -> Int -> Partial a
-xs !? index = 
-    if 0 <= index && index < length xs then Partial $ Just $ xs !! index 
+xs !? index =
+    if 0 <= index && index < length xs then Partial $ Just $ xs !! index
     else failure
 
 getCell :: [[a]] -> Int -> Int -> Partial a
@@ -120,6 +122,109 @@ getCell matrix r c = do
     row <- matrix !? r
     row !? c
 
+-- EXERCISE 3
+newtype Exception e a = Exception (Either e a) deriving (Show)
+runException :: Exception e a -> Either e a
+runException (Exception either) = either
+instance Functor (Exception e) where
+  fmap :: (a -> b) -> Exception e a -> Exception e b
+  fmap f (Exception e) = case e of
+    Left e -> Exception (Left e)
+    Right a -> Exception (Right $ f a)
+instance Applicative (Exception e) where
+  pure :: a -> Exception e a
+  pure = undefined
+  (<*>) :: Exception e (a -> b) -> Exception e a -> Exception e b
+  (<*>) = undefined
+instance Monad (Exception e) where
+  (>>=) :: Exception e a -> (a -> Exception e b) -> Exception e b
+  (Exception e) >>= f = case e of
+    Left e -> Exception (Left e)
+    Right a ->  f a
+  return :: a -> Exception e a
+  return x = Exception (Right x)
 
+raise :: e -> Exception e a
+raise exception = Exception (Left exception)
+withException :: Partial a -> e -> Exception e a
+withException partial exception = case runPartial partial of
+    Just value -> Exception $ Right value
+    Nothing -> Exception $ Left exception
 
+validatePassword :: String -> Exception String ()
+validatePassword pwd
+  | length pwd < 8 = raise "Password too short! (< 8 symbols)"
+  | not $ any (`elem` "1234567890") pwd = raise "Password does not contain a number!"
+  | not $ any isAlpha pwd = raise "Password does not contain an alphabetic character!"
+  | otherwise = return ()
+
+data MatrixError = InvalidRowIndex | InvalidColIndex deriving (Show)
+getCell' :: [[a]] -> Int -> Int -> Exception MatrixError a
+getCell' matrix r c = do
+    row <- withException (matrix !? r) InvalidRowIndex
+    withException (row !? c) InvalidColIndex
+
+-- EXERCISE 4
+newtype State s a = State (s -> (a, s))
+instance Functor (State s) where
+  fmap :: (a -> b) -> State s a -> State s b
+  fmap f (State g) = State ((\(a, s) -> (f a, s)) . g)
+instance Applicative (State s) where
+    pure :: a -> State s a
+    pure = undefined
+    (<*>) :: State s (a -> b) -> State s a -> State s b
+    (<*>) = undefined
+instance Monad (State s) where
+  (>>=) :: State s a -> (a -> State s b) -> State s b
+  State g >>= f = State $ \s ->
+    let (res, newState) = g s
+        (State stateAfterF) = f res
+    in stateAfterF newState
+  return :: a -> State s a
+  return x = State $ \s -> (x,s)
+
+runState :: State s a -> s -> (a, s)
+runState (State s) = s
+get :: State s s
+get = State $ \s -> (s,s)
+put :: s -> State s ()
+put x = State $ const ((), x)
+modify :: (s -> s) -> State s ()
+modify f = State $ \s -> ((), f s)
+
+printEval :: State Env Val -> (Val, Env)
+printEval state = runState state []
+
+eval' :: Expr -> State Env Val
+eval' (EVar x) = do
+    env <- get
+    case lookup x env of
+        Just v -> return v
+        Nothing -> return $ VError("Variable '" ++ x ++ "' is not defined.")
+eval' (EVal v) = return v
+eval' (EOp e1 o e2) = do
+    v1 <- eval' e1 
+    v2 <- eval' e2
+    return $ semOp o v1 v2
+eval' (EAssign x e) = do
+    v <- eval' e
+    env <- get
+    put (insertOrUpdate x v env)
+    return VUnit
+eval' (EWhile e1 e2) = do
+    v1 <- eval' e1
+    case v1 of
+        VBool False -> return VUnit
+        VBool True  -> eval' (ESeq e2 (EWhile e1 e2))
+        VError e    -> return $ VError e
+        _           -> return $ VError "While condition was not a bool"
+eval' (ESeq e1 e2) = do
+    v1 <- eval' e1
+    eval' e2
+
+example :: Expr
+example = ESeq (EAssign "x" $ EVal $ VInt 0)
+    (ESeq (EWhile (EOp (EVar "x") Less (EVal $ VInt 10))
+    (EAssign "x" $ EOp (EVar "x") Add (EVal $ VInt 1)))
+    (EOp (EVar "x") Add (EVal $ VInt 5)))
 
