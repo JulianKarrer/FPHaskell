@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wno-noncanonical-monad-instances #-}
 module Main where
 import Data.Maybe (isNothing, fromMaybe)
-import Data.Char (isAlpha)
+import Data.Char (isAlpha, isDigit)
 import WhileInterp
 
 main :: IO ()
@@ -47,7 +47,7 @@ ex2 = runND $ do
         abort
 
 flipCoin :: ND Bool
-flipCoin = ND [True, False]
+flipCoin = choose [True, False]
 
 flipTwoCoins :: ND (Bool, Bool)
 flipTwoCoins = do
@@ -58,6 +58,8 @@ flipTwoCoins = do
 type Graph n = [(n, [n])]
 type Coloring n c = [(n, c)]
 
+
+-- way easier option available -> see example solution
 solve :: (Eq n, Eq c) => Graph n -> [c] -> ND (Coloring n c)
 solve g colours = solve' g colours [] where
     solve' :: (Eq n, Eq c) => Graph n -> [c] -> Coloring n c -> ND (Coloring n c)
@@ -113,12 +115,15 @@ failure :: Partial a
 failure = Partial Nothing
 
 (!?) :: [a] -> Int -> Partial a
-xs !? index =
-    if 0 <= index && index < length xs then Partial $ Just $ xs !! index
-    else failure
+-- xs !? index =
+--     if 0 <= index && index < length xs then Partial $ Just $ xs !! index
+--     else failure
+[] !? _ = failure
+[x] !? 0 = return x
+(x:xs) !? i = xs !? (i-1)
 
 getCell :: [[a]] -> Int -> Int -> Partial a
-getCell matrix r c = do
+getCell matrix c r = do
     row <- matrix !? r
     row !? c
 
@@ -154,7 +159,7 @@ withException partial exception = case runPartial partial of
 validatePassword :: String -> Exception String ()
 validatePassword pwd
   | length pwd < 8 = raise "Password too short! (< 8 symbols)"
-  | not $ any (`elem` "1234567890") pwd = raise "Password does not contain a number!"
+  | not $ any isDigit pwd = raise "Password does not contain a number!"
   | not $ any isAlpha pwd = raise "Password does not contain an alphabetic character!"
   | otherwise = return ()
 
@@ -177,9 +182,10 @@ instance Applicative (State s) where
 instance Monad (State s) where
   (>>=) :: State s a -> (a -> State s b) -> State s b
   State g >>= f = State $ \s ->
-    let (res, newState) = g s
-        (State stateAfterF) = f res
-    in stateAfterF newState
+    let (res, newState) = g s in
+    --     (State stateAfterF) = f res
+    -- in stateAfterF newState
+        runState (f res) newState
   return :: a -> State s a
   return x = State $ \s -> (x,s)
 
@@ -190,7 +196,9 @@ get = State $ \s -> (s,s)
 put :: s -> State s ()
 put x = State $ const ((), x)
 modify :: (s -> s) -> State s ()
-modify f = State $ \s -> ((), f s)
+modify f = do 
+    val <- get 
+    put (f val)
 
 printEval :: State Env Val -> (Val, Env)
 printEval state = runState state []
@@ -210,6 +218,8 @@ eval' (EAssign x e) = do
     v <- eval' e
     env <- get
     put (insertOrUpdate x v env)
+    -- or: replace get + put with
+    -- modify $ insertOrUpdate x v
     return VUnit
 eval' (EWhile e1 e2) = do
     v1 <- eval' e1
