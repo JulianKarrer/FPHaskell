@@ -19,7 +19,8 @@ instance Applicative ND where
     pure :: a -> ND a
     pure x = ND [x]
     (<*>) :: ND (a -> b) -> ND a -> ND b
-    (ND fs) <*> (ND xs) = ND $ concatMap (`map` xs) fs
+    -- (ND fs) <*> (ND xs) = ND $ concatMap (`map` xs) fs
+    (ND fs) <*> (ND xs) = ND [f x | f <- fs, x <- xs]
 
 
 newtype Partial a = Partial (Maybe a) deriving (Show)
@@ -51,8 +52,8 @@ instance Applicative (Exception e) where
   pure x = Exception $ Right x
   (<*>) :: Exception e (a -> b) -> Exception e a -> Exception e b
   (Exception (Right f)) <*> (Exception (Right x)) = Exception . Right $ f x
-  (Exception _) <*> (Exception (Left ex)) = Exception . Left $ ex
   (Exception (Left ex)) <*> (Exception _) = Exception . Left $ ex
+  (Exception _) <*> (Exception (Left ex)) = Exception . Left $ ex
 
 
 newtype State s a = State (s -> (a, s))
@@ -64,9 +65,9 @@ instance Applicative (State s) where
     pure x = State $ \s -> (x,s)
     (<*>) :: State s (a -> b) -> State s a -> State s b
     cf <*> a = State $ \s ->
-        let (valA, s') = runState a s in
-        let (f, s'') = runState cf s' in
-        (f valA, s'')
+        let (f, s') = runState cf s in
+        let (x, s'') = runState a s' in
+        (f x, s'')
 instance Monad (State s) where
   (>>=) :: State s a -> (a -> State s b) -> State s b
   State g >>= f = State $ \s ->
@@ -82,6 +83,7 @@ runState (State s) = s
 -- 1
 runParserEnd :: Eq a => Parser t a -> [t] -> [a]
 runParserEnd Parser {runParser} ts = nub $ map fst $ filter (null.snd) (runParser ts)
+-- runParserEnd p ts = [ x | (x, ts') <- runParser p ts, null ts']
 
 -- 2
 instance Functor (Parser t) where
@@ -142,6 +144,7 @@ many1 pa = do
     x <- pa
     xs <- many0 pa
     return (x:xs)
+-- many1 pa = ((:) <$> pa) <*> many0 pa
 
 many0 :: Parser t a -> Parser t [a]
 many0 pa = many1 pa <|> pure []
@@ -163,6 +166,8 @@ sepBy1 p psep = oneandmore <|> one where
     x <- p
     xs <- suffix <|> pure []
     return (x:xs)
+-- sepBy1 p sep = (:[]) <$> p --one
+--   <|> (:) <$> p  <* sep <*> sepBy0 p sep -- or more, seperated
 
 
 -- 4
@@ -211,7 +216,7 @@ jobj :: Parser Char JSON
 jobj = JObject <$> (lit '{' *> ws *> jitems <* ws <* lit '}')
 
 json :: Parser Char JSON
-json = ws *> (int <|> bool <|> jnull <|> (JString <$> str) <|> jlist <|> jobj) <* ws 
+json = ws *> (int <|> bool <|> jnull <|> (JString <$> str) <|> jlist <|> jobj) <* ws
 
 
 -- some verbose tests
@@ -271,7 +276,7 @@ main = do
   -- jobj
   print $ runParserEnd jobj "{\"name\":13}" == [JObject [("name", JInt 13)]]
   -- json
-  do 
+  do
     test  <- runParserEnd json <$> readFile "example.json"
     print $ test == [
         JObject [
