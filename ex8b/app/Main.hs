@@ -1,12 +1,13 @@
+{-# LANGUAGE FlexibleContexts #-}
 module Main where
 import Control.Monad.IO.Class
 import Data.List (intercalate)
-import Control.Monad.State.Strict ( StateT, evalStateT, modify, get, put )
+import Control.Monad.State.Strict ( StateT, evalStateT, modify, get, put, MonadState )
 import Text.Read (readMaybe)
 import Control.Monad.Except
 
 main :: IO ()
-main = todo
+-- main = todo
 
 putStrLn' :: MonadIO m => String -> m ()
 putStrLn' = liftIO . putStrLn
@@ -89,37 +90,36 @@ type Env = [(Var, Val)]
 data RuntimeError = UndefinedVar String
                   | TypeError String deriving (Eq, Show)
 -- Semantics of an operator (how to apply an operator to values)
-semOp :: Op -> Val -> Val -> Either RuntimeError Val
-semOp Add  (VInt x)   (VInt y)   = Right $ VInt (x + y)
-semOp Sub  (VInt x)   (VInt y)   = Right $ VInt (x - y)
-semOp Less (VInt x)   (VInt y)   = Right $ VBool (x < y)
-semOp _    _          _          = Left $ TypeError "Operator cannot handle those arguments"
+semOp :: MonadError RuntimeError m => Op -> Val -> Val -> m Val
+semOp Add  (VInt x)   (VInt y)   = return $ VInt (x + y)
+semOp Sub  (VInt x)   (VInt y)   = return $ VInt (x - y)
+semOp Less (VInt x)   (VInt y)   = return $ VBool (x < y)
+semOp _    _          _          = throwError $ TypeError "Operator cannot handle those arguments"
 insertOrUpdate :: Var -> Val -> Env -> Env
 insertOrUpdate x v [] = [(x, v)]
 insertOrUpdate x v ((x', v') : env)
   | x == x'   = (x, v) : env
   | otherwise = (x', v') : insertOrUpdate x v env
 
--- Evaluation
-type EvalM a = ExceptT RuntimeError (StateT Env IO) a
--- Semantics of an operator (how to apply an operator to values)
-eval :: Expr -> EvalM Val
-eval (EVar x) = do
+lookupM :: (MonadError RuntimeError m, MonadState Env m) => Var -> m Val
+lookupM x = do
     env <- get
     case lookup x env of
         Just v -> return v
         Nothing -> throwError $ UndefinedVar x
+
+-- Evaluation
+eval :: (MonadError RuntimeError m, MonadState Env m, MonadIO m) => Expr -> m Val
+eval (EVar x) = lookupM x
 eval (EVal v) = do
     return v
 eval (EOp e1 o e2) = do
     v1 <- eval e1
     v2 <- eval e2
-    case semOp o v1 v2 of
-        Left err -> throwError err
-        Right res -> return res
+    semOp o v1 v2
 eval (EAssign x e) = do
     v <- eval e
-    modify (insertOrUpdate x v)
+    modify $ insertOrUpdate x v
     return VUnit
 eval self@(EWhile e1 e2) = do
     v1 <- eval e1
@@ -133,6 +133,7 @@ eval (EPrint e) = do
     print' v
     return VUnit
 
+type EvalM a = ExceptT RuntimeError (StateT Env IO) a
 printEval :: EvalM Val -> IO ()
 printEval e = do
     result <- evalStateT (runExceptT e) []
@@ -145,6 +146,6 @@ testExpression = ESeq
     (EPrint $ EOp (EVal $ VInt 42) Add (EVal $ VInt 69))
     (EPrint $ EOp (EVal $ VInt 9) Add (EVal $ VInt 10))
 
--- main = printEval $ eval testExpression
+main = printEval $ eval testExpression
 
 

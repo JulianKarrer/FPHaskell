@@ -95,6 +95,13 @@ semOp Add  (VInt x)   (VInt y)   = Right $ VInt (x + y)
 semOp Sub  (VInt x)   (VInt y)   = Right $ VInt (x - y)
 semOp Less (VInt x)   (VInt y)   = Right $ VBool (x < y)
 semOp _    _          _          = Left $ TypeError "Operator cannot handle those arguments"
+
+semOp' :: Op -> Val -> Val -> EvalM Val
+semOp' Add  (VInt x)   (VInt y)   = return $ VInt (x + y)
+semOp' Sub  (VInt x)   (VInt y)   = return $ VInt (x - y)
+semOp' Less (VInt x)   (VInt y)   = return $ VBool (x < y)
+semOp' _    _          _          = throwE $ TypeError "Operator cannot handle those arguments"
+
 insertOrUpdate :: Var -> Val -> Env -> Env
 insertOrUpdate x v [] = [(x, v)]
 insertOrUpdate x v ((x', v') : env)
@@ -110,17 +117,14 @@ eval (EVar x) = do
     case lookup x env of
         Just v -> return v
         Nothing -> throwE $ UndefinedVar x
-eval (EVal v) = do
-    return v
+eval (EVal v) = return v
 eval (EOp e1 o e2) = do
     v1 <- eval e1
     v2 <- eval e2
-    case semOp o v1 v2 of
-        Left err -> throwE err
-        Right res -> return res
+    semOp' o v1 v2
 eval (EAssign x e) = do
     v <- eval e
-    lift $ modify (insertOrUpdate x v)
+    lift $ modify $ insertOrUpdate x v
     return VUnit
 eval self@(EWhile e1 e2) = do
     v1 <- eval e1
@@ -128,7 +132,10 @@ eval self@(EWhile e1 e2) = do
         VBool False -> return VUnit
         VBool True -> eval (ESeq e2 self)
         _ -> throwE $ TypeError "While condition was not a bool"
-eval (ESeq e1 e2) = eval e1 *> eval e2
+-- eval (ESeq e1 e2) = eval e1 *> eval e2
+eval (ESeq e1 e2) = do 
+    eval e1
+    eval e2
 eval (EPrint e) = do
     v <- eval e
     lift $ lift $ print v
