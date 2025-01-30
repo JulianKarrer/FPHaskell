@@ -112,22 +112,28 @@ fresh es = head $ filter (`notElem` fvs) vars where
 (x --> e') (EOp2 e1 op e2)                  = EOp2 ((x --> e') e1) op ((x --> e') e2)
 
 step :: Exp -> Maybe Exp
+-- BETA / ETA RULES (perform computations, reduce)
 step (EApp (ELam x e1) e2) = Just $ (x --> e2) e1
 step (ELam x (EApp e (EVar y))) | x == y && x `notElem` free e = Just e
-step (EVar x) = Nothing
-step (ELam x e) = ELam x <$> step e
-step (EApp e1 e2) = (\x -> EApp x e2) <$> step e1
-                <|> (\x -> EApp e1 x) <$> step e2
--- new primitives:
-step (EInt n) = Nothing
-step (EBool b) = Nothing
--- new eliminations:
 step (EOp2 (EInt x1) OAdd (EInt x2)) = Just $ EInt (x1 + x2)
 step (EOp2 (EInt x1) OLess (EInt x2)) = Just $ EBool (x1 < x2)
 step (EOp2 (EBool b1) OAnd (EBool b2)) = Just $ EBool (b1 && b2)
--- new congrucency relations: (propagate into subterms of expression)
+-- CONGRUENCY RULES  (propagate into subterms of expression)
+step (ELam x e) = ELam x <$> step e
+step (EApp e1 e2) = (\x -> EApp x e2) <$> step e1 
+                <|> (\x -> EApp e1 x) <$> step e2
 step (EOp2 e1 op e2) = (\e1' -> EOp2 e1' op e2) <$> step e1
                    <|> (\e2' -> EOp2 e1 op e2') <$> step e2
+-- ABSENT RULES (equivalent to step _ = Nothing, step relation is not total)
+step (EVar x) = Nothing
+step (EInt n) = Nothing
+step (EBool b) = Nothing
+
+isValue :: Exp -> Bool
+isValue (EInt _) = True
+isValue (EBool _) = True
+isValue (ELam _ _) = True
+isValue _ = False
 
 steps :: Exp -> [Exp]
 steps e = case step e of
@@ -142,7 +148,7 @@ prettyOp op = case op of
 
 pretty :: Exp -> String
 pretty (EVar x)     = x
-pretty (ELam x e)   = "(\\" ++ x ++ ". " ++ pretty e ++ ")"
+pretty (ELam x e)   = "(λ" ++ x ++ ". " ++ pretty e ++ ")"
 pretty (EApp e1 e2) = "(" ++ pretty e1 ++ " " ++ pretty e2 ++ ")"
 pretty (EInt n) = show n
 pretty (EBool b) = if b then "true" else "false"
@@ -179,12 +185,6 @@ repl = do
         putStrLn "Reduction stuck!"
 
       repl
-
-isValue :: Exp -> Bool
-isValue (EInt _) = True
-isValue (EBool _) = True
-isValue (ELam _ _) = True
-isValue _ = False
 
 main :: IO ()
 main = repl
@@ -225,33 +225,35 @@ containsTVar _ = False
 undefError :: Ctx -> String
 undefError ctx = intercalate "\n         " $ (\(v,t) -> "Undefined variable "++ v ++ " of type " ++ tPretty t) <$> ctx
 
-freshT :: Int -> Type
-freshT i = TVar $ "alpha:"++show i
-
-infer' :: (MonadState Int m, MonadError TypeError m) => Exp -> m (Ctx, Type)
-infer' (EVar x) = do
-  -- get new type variable for x
+freshT :: MonadState Int m => m Type
+freshT = do
   i <- get
   modify (+1)
-  return ([(x, freshT i)], freshT i)
+  return $ TVar $ "α:" ++ show i
+
+
+infer' :: (MonadState Int m, MonadError TypeError m)=>Exp -> m (Ctx, Type)
+infer' (EVar x) = do
+  -- get new type variable for x
+  alpha <- freshT
+  return ([(x, alpha)], alpha)
 infer' (EInt _) = return ([], TInt)
 infer' (EBool _) = return ([], TBool)
 infer' (ELam x e) = do
   (a, te) <- infer' e
   case lookup x a of
-    Just tx -> return (remove (x, tx) a, TFun tx te)
+    Just tx -> do
+      let a' = filter (\(name,t) -> name/= x) a in
+        return (a', TFun tx te)
     Nothing -> do
-      i <- get
-      modify (+1)
-      return (a, TFun (freshT i) te)
+      alpha <- freshT
+      return (a, TFun alpha te)
 infer' (EApp m0 m1) = do
   (a0, t0) <- infer' m0
   (a1, t1) <- infer' m1
-  i <- get
-  modify (+1)
-  let alpha = freshT i in do
-    s <- mgu $ ctxEqPairs a0 a1 ++ [(t0, TFun t1 alpha)]
-    return (nub $ applySub s a0 ++ applySub s a1, subst s alpha)
+  alpha <- freshT
+  s <- mgu $ ctxEqPairs a0 a1 ++ [(t0, TFun t1 alpha)]
+  return (nub $ applySub s a0 ++ applySub s a1, subst s alpha)
 infer' (EOp2 m0 op m1) = let (t0constr, t1constr, rettype) = op2types op in do
   (a0, t0) <- infer' m0
   (a1, t1) <- infer' m1
@@ -289,20 +291,19 @@ tPretty TBool = "Bool"
 tPretty (TVar x) = x
 tPretty (TFun t1 t2) = "(" ++ tPretty t1 ++ " -> " ++ tPretty t2 ++ ")"
 
+
+-- TODO: recursive unification error
 mgu1 :: MonadError TypeError m => Type -> Type -> m Sub
+mgu1 t1 t2               | t1==t2 = return [] -- no substitution if types are already equal
 -- one or more type variables involved
 mgu1 t1 (TVar x)                  = return [(x, t1)]
 mgu1 (TVar x) t2                  = return [(x, t2)]
--- function types
+-- function types: unify argument types and return types simultaneously using mgu
 mgu1 (TFun tfrom1 tto1) (TFun tfrom2 tto2) = do mgu [(tfrom1, tfrom2), (tto1, tto2)]
--- one or more basic type
-mgu1 t1 t2 = do
-  if t1 == t2 then
-    return []
-  else
-    throwError $ "Cannot unify " ++ tPretty t1 ++ " and " ++ tPretty t2 ++ "!"
+-- otherwise fail
+mgu1 t1 t2 = throwError $ "Cannot unify " ++ tPretty t1 ++ " and " ++ tPretty t2 ++ "!"
 
-subst' :: Sub -> (Type, Type) -> (Type, Type)
+subst' :: Sub -> (Type, Type) -> (Type, Type) -- this is basically bimap
 subst' sub (t1, t2) = (subst sub t1, subst sub t2)
 
 mgu :: MonadError TypeError m => [(Type, Type)] -> m Sub
