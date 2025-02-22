@@ -1,4 +1,4 @@
-# Revision history for test-project
+# Revision history for rex2
 
 ## 0.1.0.0 -- YYYY-mm-dd
 

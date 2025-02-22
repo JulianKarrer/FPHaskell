@@ -1,0 +1,230 @@
+\documentclass[oneside, a4paper]{article}
+\usepackage[a4paper,width=150mm,top=25mm,bottom=25mm,bindingoffset=6mm]{geometry}
+
+% Required for inserting images
+\usepackage{eso-pic,graphicx}
+% misc
+\usepackage{caption}
+\DeclareCaptionType{equ}[][]
+%\captionsetup[equ]{labelformat=empty}
+\usepackage{subcaption}
+\usepackage{multicol}
+\usepackage{float}
+\usepackage{adjustbox} % oversized table
+% Default font to sans serif
+\renewcommand{\familydefault}{\sfdefault}
+\RequirePackage[T1]{fontenc} 
+\RequirePackage[tt=false, type1=true]{libertine} 
+\RequirePackage[varqu]{zi4} 
+% \RequirePackage[libertine]{newtxmath}
+% chapters and headers
+\usepackage[Conny]{fncychap}
+% epigraphs
+\usepackage{epigraph}
+% algorithms
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+% FAT FONTS
+\usepackage{bm} % bold fonts in math mode
+\newcommand\fat[1]{{\boldmath{\textbf{#1}}}}
+\newcommand\dfn[1]{{\scshape\bfseries#1}}
+% mathematical fonts and graphics
+\usepackage{mathtools}
+\usepackage{xfrac} % sfrac for diagonal slashes in fractions
+\usepackage{amsfonts} % math fonts
+\usepackage{dsfont} % math fonts
+\usepackage{bbm} % mathbb fonts
+\usepackage{mathrsfs} % fancy swirly font
+\usepackage{gensymb} % degree sign
+% draw graphs
+\usepackage[inline]{asymptote}
+\usepackage{qtree}
+\usepackage{tikz}
+% nicer fractions
+\usepackage{xfrac}
+% cancel terms
+\usepackage{cancel}
+% units
+\usepackage{siunitx}
+% plots
+\usepackage{pgfplots}
+\usepackage{pgfplotstable}
+\usepgfplotslibrary{external}
+\usepgfplotslibrary{patchplots}
+\usepgfplotslibrary{groupplots}
+\pgfplotsset{compat=1.18} 
+\tikzexternalize[prefix=tikz,optimize=false]
+% define the Spectral_r color scheme
+\usepackage{xcolor}
+\definecolor{Spectral0}{RGB}{158, 1, 66}
+\definecolor{Spectral1}{RGB}{213, 62, 79}
+\definecolor{Spectral2}{RGB}{244, 109, 67}
+\definecolor{Spectral3}{RGB}{253, 174, 97}
+\definecolor{Spectral4}{RGB}{254,224,139}
+\definecolor{Spectral5}{RGB}{255,255,191}
+\definecolor{Spectral6}{RGB}{230,245,152}
+\definecolor{Spectral7}{RGB}{171,221,164}
+\definecolor{Spectral8}{RGB}{102,204,204}
+\definecolor{Spectral9}{RGB}{50,136,189}
+\definecolor{Spectral10}{RGB}{94,79,162}
+\pgfplotsset{
+  colormap={Spectral_r}{
+    rgb255(0cm)=(94,79,162)         % 0.0
+    rgb255(1cm)=(50,136,189)        % 0.1
+    rgb255(2cm)=(102,204,204)       % 0.2
+    rgb255(3cm)=(171,221,164)       % 0.3
+    rgb255(4cm)=(230,245,152)       % 0.4
+    rgb255(5cm)=(255,255,191)       % 0.5
+    rgb255(6cm)=(254,224,139)       % 0.6
+    rgb255(7cm)=(253,174,97)        % 0.7
+    rgb255(8cm)=(244,109,67)        % 0.8
+    rgb255(9cm)=(213,62,79)         % 0.9
+    rgb255(10cm)=(158,1,66)         % 1.0
+    }
+}
+% get width of given text
+\usepackage{calc}
+% define a horizontal spacer
+\newcommand\horizontalspacer[0]{\vspace{5pt}\noindent\textcolor{lightgray}{\rule{\textwidth}{1mm}}
+\vspace{5pt}}
+
+\newcommand\assertionbox[2]{
+\begin{mdframed}[roundcorner=10pt]
+  \dfn{Assertions and Tests}
+  #1
+  \begin{enumerate}
+    #2
+  \end{enumerate}
+\end{mdframed}
+}
+% clickable links
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks,
+    citecolor=black,
+    filecolor=black,
+    linkcolor=black,
+    urlcolor=black
+}
+% citations
+\usepackage[
+  backend=biber,
+  sorting=none,
+  style=phys,
+]{biblatex}
+\addbibresource{refs.bib}
+% fancy boxes
+\usepackage{fancybox}
+% labels to enum items
+\usepackage{enumitem}
+% framed boxes
+\usepackage{mdframed}
+% titles, author, date
+\usepackage{titling}
+% ~~~~~~~~~ TYPESETTING AND OTHER MACROS ~~~~~~~~~~~~~~~~~~~~~
+\newenvironment{absolutelynopagebreak}
+  {\par\nobreak\vfil\penalty0\vfilneg
+   \vtop\bgroup}
+  {\par\xdef\tpd{\the\prevdepth}\egroup
+   \prevdepth=\tpd}
+
+% EXERCISE-SHEEt SPECIFIC
+  \makeatletter
+   \def\@maketitle{%
+     \newpage
+     \null
+     \vskip 1em%
+     \begin{center}%
+     \let \footnote \thanks
+       {\LARGE \@title \par}%
+       \vskip 1em%
+       %{\large \@date}%
+     \end{center}%
+     \par
+     \vskip 1em}
+   \makeatother
+   \author{ }
+   \usepackage{fancyhdr}
+     \fancypagestyle{plain}{%  the preset of fancyhdr 
+         \fancyhf{} % clear all header and footer fields
+         \fancyhead[L]{Functional Programming in Haskell}
+         \fancyhead[R]{\theauthor}
+     }
+% strikeout
+\usepackage{cancel}
+% MATH DECLARATIONS
+\newcommand\abs[1]{\left|#1\right|}
+\newcommand\norm[1]{\left\lVert#1\right\rVert}
+\newcommand\angled[1]{\left\langle#1\right\rangle}
+\newcommand*\Laplace{\mathop{}\!\mathbin\nabla^2}
+\newcommand\vek[1]{\vec{\bm{#1}}}
+\newcommand\mat[1]{{\mathds{#1}}}
+\newcommand\br[1]{\left(#1\right)}
+\newcommand\ol[1]{\overline{#1}}
+\DeclareMathOperator*{\argmax}{\arg\!\max}
+\DeclareMathOperator*{\argmin}{\arg\!\min}
+\newcommand\m[0]{\si{\m}}
+\newcommand\s[0]{\si{\s}}
+\newcommand\kg[0]{\si{\kg}}
+\newcommand\N[0]{\si{\newton}}
+\newcommand\del[0]{\partial}
+\newcommand\cst[0]{\text{const}}
+\newcommand\nvek[1]{\hat{\vek{#1}}}
+\newcommand\spc[0]{$\quad$}
+\newcommand\ddt[0]{\frac{\del}{\del t}}
+\newcommand\ddx[1]{\frac{\del}{\del #1}}
+
+\usepackage{fourier} % warning sign 
+\usepackage{minted} % code with syntax highlights
+% \usemintedstyle{tango}
+
+\title{Functional Programming in Haskell}
+\begin{document}
+\maketitle
+
+\section{Overview and Syntax}
+\begin{itemize}
+  \item Algebraic Datatypes and Pattern Matching
+  \begin{minted}{haskell}
+    data Example = C1 | C2 Int Int
+    
+    val :: Example
+    val = C2 1312 420
+  
+    first :: Example -> Maybe Int
+    first d = case d of 
+      C2 a b -> Just a,
+      _      -> Nothing
+  \end{minted}
+  \item Polymorphism: lower case type e.g. \texttt{a -> a} where \texttt{a} is a type variable
+  \item Type classes: predicates on types, used as constraints (like Traits/Interfaces) \begin{minted}{haskell}
+    class Show a where 
+      show :: a -> Result
+
+    instance Show Example where 
+      show e = ...
+
+    showBoth :: (Show a, Show b) => a -> b -> Result
+  \end{minted}
+  \item Lazy Evaluation $\Longrightarrow$ potential speedups,  infinite lists are possible (see \texttt{foldr} vs \texttt{foldl} exercise)
+  \item Purely functional, no side effects (instead, return descriptions of side effects and compose them using monads)
+  \item Weird Syntax \begin{minted}{haskell}
+    1 /= 0 == True    -- not !=
+    not False == True -- `not' written out but `&&' and `||' exist
+    [1,2,3] !! 0 == 1 -- indexing operator !!
+    "ab" == ['a','b'] -- strings are UTF8-Linked Lists
+  \end{minted}
+  \item Pattern guards in pattern matching: Give additional condition as boolean predicate $\Longrightarrow$ use catch-all \texttt{otherwise} or \texttt{\_} to ensure exhaustive matching since predicate could be undecidable
+  \item Curried functions are standard, uncurried provides tuple instead (less laziness?)
+  \item Pattern match and destructure expressions anywhere
+  \begin{minted}{haskell}
+    addCurried = \(x,y) -> x + y -- destructure tuple in lambda args
+    empty (x:xs) = False         -- match on function argument
+  \end{minted}
+  \item like a Boeing whistleblower on the court date, there are no statements
+\end{itemize}
+
+
+
+
+\end{document}
