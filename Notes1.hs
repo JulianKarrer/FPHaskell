@@ -93,3 +93,9 @@ sumTree (Branch l i r) = i + sumTree l + sumTree r
 -- insert Leaf x
 
 
+-------
+
+primes :: [Integer]
+primes = 1 : sieve [2..]
+sieve :: Integral a => [a] -> [a]
+sieve (p:xs) = p : sieve [x | x<-xs, x `mod` p /= 0]
