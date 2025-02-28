@@ -99,3 +99,32 @@ primes :: [Integer]
 primes = 1 : sieve [2..]
 sieve :: Integral a => [a] -> [a]
 sieve (p:xs) = p : sieve [x | x<-xs, x `mod` p /= 0]
+
+
+------
+
+data BTreee = Leafy Int | Branchy BTreee BTreee deriving Show
+
+minTree :: BTreee -> BTreee
+minTree t = let (mini, constr) = minTree' t in
+  constr mini
+
+minTree' :: BTreee -> (Int, Int -> BTreee)
+minTree' (Leafy i) = (i, Leafy)
+minTree' (Branchy l r) = 
+  let (lmin, lconstr) = minTree' l in
+  let (rmin, rconstr) = minTree' r in
+  (min lmin rmin, \n -> Branchy (lconstr n) (rconstr n))
+
+exampleBTree :: BTreee
+exampleBTree = Branchy (Branchy (Branchy (Leafy 4) (Leafy 9)) (Leafy 2)) (Branchy (Leafy (-1)) (Leafy 6)) 
+
+------
+
+
+-- orderedList :: (Arbitrary a, Ord a) => Gen [a]
+-- orderedList = sort <$> arbitrary
+
+-- sampled_ordered :: IO ()
+-- sampled_ordered = sample (orderedList::Gen [Int])
+
