@@ -119,7 +119,7 @@ eval (EEqual (EBool x) (EBool y)) = x == y
 data Nat = Z | S Nat
 
 data Vec a (n::Nat) where
-    VNil :: Vec () Z 
+    VNil :: Vec () Z
     (:>):: a -> Vec a n -> Vec a (S n)
 
 infixr 5 :>
@@ -207,9 +207,9 @@ runCommand (Conditional False _ y) = runCommand y
 --     These functions must be total on non‑empty lists.
 --     Their type signatures should reflect the structure of the type‑level list.
 -------------------------------------------------------------------------------
-data HList (xs::[Type]) where 
+data HList (xs::[Type]) where
     HNil :: HList '[]
-    (:|) :: a -> HList (t :ts) -> HList (a : t : ts) 
+    (:|) :: a -> HList (t :ts) -> HList (a : t : ts)
 
 hHead :: HList (x ': xs) -> x
 hHead (x :| xs) = x
@@ -218,8 +218,6 @@ hTail :: HList (x ': xs) -> HList xs
 hTail (_ :| xs) = xs
 
 -------------------------------------------------------------------------------
-
-
 
 
 
