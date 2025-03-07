@@ -23,6 +23,7 @@ cabal.project.local~
 .ghc.environment.*
 lectures
 exam-ple
+exam-ple2
 
 # from here on, tex gitignore
 ## Core latex/pdflatex auxiliary files:
